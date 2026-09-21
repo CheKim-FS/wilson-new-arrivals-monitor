@@ -88,7 +88,9 @@ ntfy_topic = os.environ.get("NTFY_TOPIC")
 if not ntfy_topic:
     raise RuntimeError("NTFY_TOPIC이 설정되어 있지 않습니다.")
 
-# 6. 새 상품마다 알림 보내기
+# 6. 새 상품 알림 보내기
+successfully_notified = []
+
 for product_no in sorted(
     new_product_ids,
     key=int,
@@ -120,4 +122,23 @@ for product_no in sorted(
 
     notify_response.raise_for_status()
 
-print("알림 전송 완료")
+    successfully_notified.append(product_no)
+
+    print("알림 전송 성공:", product_no)
+
+# 7. 알림 전송에 성공한 상품만 기존 상품 목록에 추가
+if successfully_notified:
+    updated_products = seen_products.union(successfully_notified)
+
+    with open(SEEN_FILE, "w", encoding="utf-8") as f:
+        for product_no in sorted(
+            updated_products,
+            key=int,
+            reverse=True
+        ):
+            f.write(product_no + "\n")
+
+    print(
+        "seen_products.txt 업데이트 완료:",
+        len(updated_products)
+    )
