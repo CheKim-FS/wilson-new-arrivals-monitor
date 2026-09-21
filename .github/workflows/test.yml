@@ -40,3 +40,15 @@ jobs:
             git commit -m "Update seen Wilson products"
             git push
           fi
+
+      - name: Send failure notification
+        if: ${{ failure() }}
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          curl --fail \
+            -H "Title: Wilson Monitor ERROR" \
+            -H "Priority: high" \
+            -H "Tags: warning" \
+            -d "Wilson 신상품 모니터 실행에 실패했습니다. GitHub Actions를 확인하세요." \
+            "https://ntfy.sh/$NTFY_TOPIC"
