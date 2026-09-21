@@ -99,7 +99,7 @@ for product_no in sorted(
     print("NEW:", product_no, product["name"])
 
     notification_headers = {
-        "Title": "Wilson 신상품 발견!",
+        "Title": "Wilson New Arrival!",
         "Priority": "high",
         "Tags": "baseball",
         "Click": product["url"]
