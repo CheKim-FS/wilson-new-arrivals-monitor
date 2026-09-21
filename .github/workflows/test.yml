@@ -20,15 +20,6 @@ jobs:
         run: pip install requests beautifulsoup4
 
       - name: Check Wilson mobile site
-        run: python monitor.py
-
-      - name: Send ntfy test notification
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: |
-          curl \
-            -H "Title: Wilson Monitor" \
-            -H "Priority: high" \
-            -H "Tags: baseball" \
-            -d "Wilson 신상품 모니터 테스트 성공!" \
-            "https://ntfy.sh/$NTFY_TOPIC"
+        run: python monitor.py
