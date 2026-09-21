@@ -23,7 +23,7 @@ with open(SEEN_FILE, "r", encoding="utf-8") as f:
 
 print("기존 상품 수:", len(seen_products))
 
-# 2. Wilson 페이지 가져오기
+# 2. Wilson 모바일 홈페이지 가져오기
 response = requests.get(
     URL,
     headers=headers,
@@ -33,10 +33,37 @@ response.raise_for_status()
 
 soup = BeautifulSoup(response.text, "html.parser")
 
-# 3. 현재 상품 추출
+# 3. NEW ARRIVALS 영역 찾기
+new_arrivals_heading = None
+
+for h2 in soup.find_all("h2"):
+    if "NEW ARRIVALS" in h2.get_text(" ", strip=True).upper():
+        new_arrivals_heading = h2
+        break
+
+if new_arrivals_heading is None:
+    raise RuntimeError(
+        "NEW ARRIVALS 영역을 찾지 못했습니다. 사이트 구조를 확인하세요."
+    )
+
+# 검사 결과 확인된 NEW ARRIVALS 상품 컨테이너
+new_arrivals_section = new_arrivals_heading.find_parent(
+    "div",
+    class_=lambda classes:
+        classes and "xans-product-listmain-2" in classes
+)
+
+if new_arrivals_section is None:
+    raise RuntimeError(
+        "NEW ARRIVALS 상품 컨테이너를 찾지 못했습니다."
+    )
+
+print("NEW ARRIVALS 영역 확인 완료")
+
+# 4. NEW ARRIVALS 안의 상품만 추출
 products = {}
 
-for a in soup.find_all("a", href=True):
+for a in new_arrivals_section.find_all("a", href=True):
     href = a["href"]
 
     if "product/detail.html" not in href:
@@ -54,10 +81,23 @@ for a in soup.find_all("a", href=True):
 
     product_no = product_no[0]
 
+    # 이미지 링크와 상품명 링크가 중복되므로
+    # 같은 product_no는 한 번만 처리
     if product_no in products:
         continue
 
-    name = " ".join(a.stripped_strings).strip()
+    # 상품명은 해당 상품의 li 영역에서 가져옴
+    product_li = a.find_parent("li")
+
+    if product_li is None:
+        continue
+
+    name_tag = product_li.select_one("strong.name a")
+
+    if name_tag is None:
+        continue
+
+    name = " ".join(name_tag.stripped_strings).strip()
 
     if not name:
         continue
@@ -67,9 +107,16 @@ for a in soup.find_all("a", href=True):
         "url": full_url
     }
 
-print("현재 상품 수:", len(products))
+print("현재 NEW ARRIVALS 상품 수:", len(products))
 
-# 4. 기존 목록에 없는 상품 찾기
+# 사이트 구조가 바뀌어 상품을 하나도 못 찾았는데
+# 정상으로 오인하는 상황 방지
+if not products:
+    raise RuntimeError(
+        "NEW ARRIVALS 상품을 하나도 찾지 못했습니다."
+    )
+
+# 5. 기존 목록에 없는 상품 찾기
 new_product_ids = [
     product_no
     for product_no in products
@@ -82,13 +129,15 @@ if not new_product_ids:
 
 print("새 상품 발견:", len(new_product_ids))
 
-# 5. ntfy Topic 불러오기
+# 6. ntfy Topic 불러오기
 ntfy_topic = os.environ.get("NTFY_TOPIC")
 
 if not ntfy_topic:
-    raise RuntimeError("NTFY_TOPIC이 설정되어 있지 않습니다.")
+    raise RuntimeError(
+        "NTFY_TOPIC이 설정되어 있지 않습니다."
+    )
 
-# 6. 새 상품 알림 보내기
+# 7. 새 상품 알림 보내기
 successfully_notified = []
 
 for product_no in sorted(
@@ -126,9 +175,11 @@ for product_no in sorted(
 
     print("알림 전송 성공:", product_no)
 
-# 7. 알림 전송에 성공한 상품만 기존 상품 목록에 추가
+# 8. 알림 전송에 성공한 상품만 저장
 if successfully_notified:
-    updated_products = seen_products.union(successfully_notified)
+    updated_products = seen_products.union(
+        successfully_notified
+    )
 
     with open(SEEN_FILE, "w", encoding="utf-8") as f:
         for product_no in sorted(
