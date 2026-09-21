@@ -24,8 +24,6 @@ jobs:
       - name: Install packages
         run: pip install requests beautifulsoup4
 
-      - name: Failure notification test
-        run: exit 1
 
       - name: Check Wilson mobile site
         env:
