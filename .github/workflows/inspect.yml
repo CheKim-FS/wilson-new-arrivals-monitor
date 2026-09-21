@@ -1,0 +1,23 @@
+name: Inspect New Arrivals
+
+on:
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: pip install requests beautifulsoup4
+
+      - name: Inspect NEW ARRIVALS structure
+        run: python inspect_new_arrivals.py
