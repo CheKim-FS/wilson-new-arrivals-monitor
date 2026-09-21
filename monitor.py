@@ -1,8 +1,10 @@
+import os
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs
 
 URL = "https://m.wilsonbaseball.co.kr/"
+SEEN_FILE = "seen_products.txt"
 
 headers = {
     "User-Agent": (
@@ -11,6 +13,17 @@ headers = {
     )
 }
 
+# 1. 이미 확인한 상품번호 불러오기
+with open(SEEN_FILE, "r", encoding="utf-8") as f:
+    seen_products = {
+        line.strip()
+        for line in f
+        if line.strip()
+    }
+
+print("기존 상품 수:", len(seen_products))
+
+# 2. Wilson 페이지 가져오기
 response = requests.get(
     URL,
     headers=headers,
@@ -20,10 +33,10 @@ response.raise_for_status()
 
 soup = BeautifulSoup(response.text, "html.parser")
 
+# 3. 현재 상품 추출
 products = {}
 
 for a in soup.find_all("a", href=True):
-
     href = a["href"]
 
     if "product/detail.html" not in href:
@@ -41,13 +54,11 @@ for a in soup.find_all("a", href=True):
 
     product_no = product_no[0]
 
-    # 같은 상품이 여러 영역에 노출되어도 한 번만 저장
     if product_no in products:
         continue
 
     name = " ".join(a.stripped_strings).strip()
 
-    # 상품명이 링크 내부에 없는 항목 제외
     if not name:
         continue
 
@@ -56,17 +67,57 @@ for a in soup.find_all("a", href=True):
         "url": full_url
     }
 
-print("=== WILSON PRODUCT MONITOR ===")
-print("총 상품 수:", len(products))
-print()
+print("현재 상품 수:", len(products))
 
-for product_no, product in sorted(
-    products.items(),
-    key=lambda x: int(x[0]),
+# 4. 기존 목록에 없는 상품 찾기
+new_product_ids = [
+    product_no
+    for product_no in products
+    if product_no not in seen_products
+]
+
+if not new_product_ids:
+    print("새 상품 없음")
+    raise SystemExit(0)
+
+print("새 상품 발견:", len(new_product_ids))
+
+# 5. ntfy Topic 불러오기
+ntfy_topic = os.environ.get("NTFY_TOPIC")
+
+if not ntfy_topic:
+    raise RuntimeError("NTFY_TOPIC이 설정되어 있지 않습니다.")
+
+# 6. 새 상품마다 알림 보내기
+for product_no in sorted(
+    new_product_ids,
+    key=int,
     reverse=True
 ):
+    product = products[product_no]
 
-    print("PRODUCT NO:", product_no)
-    print("NAME:", product["name"])
-    print("LINK:", product["url"])
-    print("-----")
+    print("NEW:", product_no, product["name"])
+
+    notification_headers = {
+        "Title": "Wilson 신상품 발견!",
+        "Priority": "high",
+        "Tags": "baseball",
+        "Click": product["url"]
+    }
+
+    message = (
+        f"{product['name']}\n"
+        f"상품번호: {product_no}\n"
+        f"알림을 눌러 상품 페이지로 이동"
+    )
+
+    notify_response = requests.post(
+        f"https://ntfy.sh/{ntfy_topic}",
+        data=message.encode("utf-8"),
+        headers=notification_headers,
+        timeout=20
+    )
+
+    notify_response.raise_for_status()
+
+print("알림 전송 완료")
