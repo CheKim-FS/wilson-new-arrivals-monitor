@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 
 URL = "https://m.wilsonbaseball.co.kr/"
 
@@ -15,8 +16,19 @@ response.raise_for_status()
 
 soup = BeautifulSoup(response.text, "html.parser")
 
-# 페이지의 상품명 텍스트 확인
-text = soup.get_text(" ", strip=True)
+print("=== NEW ARRIVALS LINK TEST ===")
 
-print("Wilson page loaded successfully.")
-print(text[:3000])
+found = False
+
+for a in soup.find_all("a", href=True):
+    text = " ".join(a.stripped_strings)
+
+    if "이정후" in text:
+        found = True
+        print("TEXT:", text)
+        print("LINK:", urljoin(URL, a["href"]))
+        print("HTML:", str(a)[:1500])
+        print("-----")
+
+if not found:
+    print("ERROR: 이정후 상품 링크를 찾지 못했습니다.")
