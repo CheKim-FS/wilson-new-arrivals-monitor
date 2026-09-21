@@ -3,6 +3,9 @@ name: Test Wilson Monitor
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,3 +26,15 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python monitor.py
+
+      - name: Save new products
+        run: |
+          if git diff --quiet -- seen_products.txt; then
+            echo "새로 저장할 상품 없음"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add seen_products.txt
+            git commit -m "Update seen Wilson products"
+            git push
+          fi
